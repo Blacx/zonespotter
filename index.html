@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ZoneSpotter – the AI foot-zone spotter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="description" content="Draw zones on your camera and let AI vision tell your micro:bit when someone steps into them.">
+  <meta name="theme-color" content="#1b1464">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ZoneSpotter">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============ START SCREEN ============ -->
+    <section id="start" class="screen">
+      <div class="start-card">
+        <svg class="mascot" viewBox="0 0 120 120" role="img" aria-label="Spotty the friendly robot">
+          <line x1="60" y1="10" x2="60" y2="24" stroke="#ffd23f" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="60" cy="9" r="6" fill="#ff6b6b"/>
+          <rect x="14" y="24" width="92" height="76" rx="24" fill="#4cc9f0"/>
+          <rect x="22" y="32" width="76" height="60" rx="18" fill="#fff"/>
+          <circle cx="60" cy="62" r="22" fill="#1b1464"/>
+          <circle cx="60" cy="62" r="12" fill="#8e6bff"/>
+          <circle cx="54" cy="56" r="5" fill="#fff"/>
+          <rect x="4" y="52" width="10" height="22" rx="5" fill="#ffd23f"/>
+          <rect x="106" y="52" width="10" height="22" rx="5" fill="#ffd23f"/>
+        </svg>
+        <h1>ZoneSpotter</h1>
+        <p class="tagline">Teach your camera to spot feet in magic zones, then tell your micro:bit!</p>
+
+        <ol class="steps" aria-label="How it works">
+          <li><span class="num">1</span><span>Connect your micro:bit</span></li>
+          <li><span class="num">2</span><span>Draw zones on the camera</span></li>
+          <li><span class="num">3</span><span>Name each zone</span></li>
+        </ol>
+
+        <button id="startBtn" class="btn btn-big btn-yellow">Start the camera</button>
+        <p id="startStatus" class="start-status" role="status" aria-live="polite"></p>
+        <p class="privacy">Your camera picture stays on your device. Nothing is uploaded.</p>
+      </div>
+    </section>
+
+    <!-- ============ MAIN SCREEN ============ -->
+    <section id="main" class="screen" hidden>
+      <div id="stage">
+        <video id="video" playsinline muted autoplay></video>
+        <canvas id="overlay"></canvas>
+      </div>
+
+      <header id="topbar">
+        <div class="brand">ZoneSpotter</div>
+        <div id="signalPill" class="pill" title="What the micro:bit is being told right now">
+          <span class="pill-label">Sending</span> <strong id="signalText">CLEAR</strong>
+        </div>
+        <div class="top-actions">
+          <button id="btBtn" class="icon-btn" aria-label="Connect micro:bit">
+            <span class="icon">🤖</span><span id="btDot" class="dot"></span><span id="btLabel" class="label">Connect</span>
+          </button>
+          <button id="flipBtn" class="icon-btn" aria-label="Switch camera" hidden>
+            <span class="icon">🔄</span><span class="label">Flip</span>
+          </button>
+          <button id="fsBtn" class="icon-btn" aria-label="Full screen">
+            <span class="icon">⛶</span><span class="label">Full</span>
+          </button>
+          <button id="clearBtn" class="icon-btn" aria-label="Clear all zones">
+            <span class="icon">🗑️</span><span class="label">Clear</span>
+          </button>
+        </div>
+      </header>
+
+      <pre id="debugBox" class="debug-box" hidden></pre>
+
+      <div id="hint" class="hint" role="status" aria-live="polite"></div>
+
+      <footer id="bottombar">
+        <button id="newZoneBtn" class="btn btn-green">➕ New zone</button>
+        <div id="chips" class="chips" aria-label="Your zones"></div>
+      </footer>
+    </section>
+
+    <!-- ============ SHEETS (pop-up panels) ============ -->
+    <div id="scrim" class="scrim" hidden></div>
+
+    <form id="nameSheet" class="sheet" hidden autocomplete="off">
+      <h2 id="nameTitle">Name your zone</h2>
+      <div class="modes" role="group" aria-label="What should this zone watch for?">
+        <button type="button" class="mode-btn" data-mode="pose" aria-pressed="true">
+          <span class="mode-icon">🦶</span>
+          <span class="mode-text"><span class="mode-title">Feet</span><span class="mode-sub">AI spots left and right ankles</span></span>
+        </button>
+        <button type="button" class="mode-btn" data-mode="motion" aria-pressed="false">
+          <span class="mode-icon">🏃</span>
+          <span class="mode-text"><span class="mode-title">Movement</span><span class="mode-sub">Anything that moves in the zone</span></span>
+        </button>
+      </div>
+      <label for="tagInput" class="sheet-text">Pick a short name. This is what your micro:bit will receive.</label>
+      <input id="tagInput" type="text" inputmode="text" enterkeyhint="done" maxlength="20"
+             autocapitalize="off" autocorrect="off" spellcheck="false"
+             placeholder="for example: stop_car">
+      <p class="sheet-small">Use letters, numbers and _ (no spaces). Up to 20 characters.</p>
+      <p class="preview">micro:bit gets: <strong id="tagPreview">…</strong></p>
+      <p id="tagError" class="error" role="alert"></p>
+      <div class="sheet-buttons">
+        <button type="submit" id="nameSave" class="btn btn-green">Save zone</button>
+        <button type="button" id="nameDelete" class="btn btn-red" hidden>Delete zone</button>
+        <button type="button" id="nameCancel" class="btn btn-plain">Cancel</button>
+      </div>
+    </form>
+
+    <div id="askSheet" class="sheet" hidden>
+      <h2 id="askTitle"></h2>
+      <p id="askText" class="sheet-text"></p>
+      <div id="askButtons" class="sheet-buttons"></div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+
+  <!-- ml5.js runs the AI vision model (MoveNet body pose). No other libraries needed. -->
+  <script src="https://unpkg.com/ml5@1.4.0/dist/ml5.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
