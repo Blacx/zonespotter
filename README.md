@@ -43,7 +43,11 @@ Open `http://localhost:8000` in **Chrome or Edge**.
    - scripts from `https://unpkg.com` (the ml5 library),
    - the AI model download from `tfhub.dev` (and whatever host it redirects to, check the browser's Network tab),
    - `camera=(self)` and `bluetooth=(self)`.
-5. When you update the files later, change `CACHE = "zonespotter-v1"` in `sw.js` to `v2`, `v3`, and so on, so phones pick up the new version.
+5. When you update the files later, raise the version number in **two places** to the same new number (for example 6 → 7), so phones and browsers pick up the new version straight away:
+   - `index.html`: `styles.css?v=6` and `app.js?v=6`
+   - `sw.js`: `CACHE = "zonespotter-v6"` (and the two `?v=6` entries in its file list)
+
+   The service worker also checks with the server on every load (`cache: "no-cache"`), so even if you forget, a long browser cache time set by your host (Cloudflare uses 4 hours) cannot keep an old `app.js` around.
 
 The first start downloads the AI model, so it needs an internet connection and takes a few seconds.
 

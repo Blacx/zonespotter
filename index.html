@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
   <div id="app">
@@ -136,8 +136,9 @@
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   </div>
 
+  <!-- When you release new files, bump ?v= on styles.css and app.js (and CACHE in sw.js) to the same number. -->
   <!-- ml5.js runs the AI vision model (MoveNet body pose). No other libraries needed. -->
   <script src="https://unpkg.com/ml5@1.4.0/dist/ml5.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

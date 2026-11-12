@@ -1,14 +1,16 @@
 /* ZoneSpotter service worker
  * Keeps the app files on the device so the page opens quickly and can be installed.
  * It always tries the network first, so new versions show up as soon as you upload them.
+ * Every request asks the server "has this changed?" (cache: "no-cache"), so the browser's own HTTP cache
+ * (Cloudflare tells it to keep files for hours) can never hand back an old app.js.
  * (The AI model and ml5 library come from the internet, so ZoneSpotter still needs a connection.)
  */
-const CACHE = "zonespotter-v5";
+const CACHE = "zonespotter-v6";   // keep the same number as ?v= in index.html
 const SHELL = [
   "./",
   "index.html",
-  "styles.css",
-  "app.js",
+  "styles.css?v=6",
+  "app.js?v=6",
   "manifest.webmanifest",
   "icons/icon.svg",
   "icons/icon-192.png",
@@ -19,7 +21,9 @@ const SHELL = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((cache) => cache.addAll(SHELL.map((url) => new Request(url, { cache: "no-cache" }))))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -38,7 +42,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;   // CDN and model downloads go straight to the network
 
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-cache" })   // check with the server every time; a "not modified" reply is tiny
       .then((res) => {
         if (res.ok && res.status === 200) {
           const copy = res.clone();
@@ -46,6 +50,6 @@ self.addEventListener("fetch", (event) => {
         }
         return res;
       })
-      .catch(() => caches.match(req).then((hit) => hit || caches.match("index.html")))
+      .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match("index.html")))
   );
 });
