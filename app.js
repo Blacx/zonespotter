@@ -42,6 +42,15 @@
     motion: { icon: "🏃", name: "Movement" },
   };
 
+  // How important a zone is. When people are in several zones at once, the micro:bit gets the zone
+  // with the most stars. Zones with the same stars: the one entered most recently wins.
+  const PRIORITIES = {
+    1: { stars: "⭐", name: "Normal" },
+    2: { stars: "⭐⭐", name: "Important" },
+    3: { stars: "⭐⭐⭐", name: "Most important" },
+  };
+  const DEFAULT_PRIORITY = 1;
+
   // micro:bit Bluetooth UART service. The micro:bit numbers its two characteristics the other way round from
   // the Nordic standard: we WRITE to 6e400003 (the micro:bit receives); 6e400002 is the one it sends on.
   const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -72,13 +81,14 @@
     askSheet: $("askSheet"), askTitle: $("askTitle"), askText: $("askText"), askButtons: $("askButtons"),
   };
   const modeButtons = Array.from(document.querySelectorAll(".mode-btn"));
+  const prioButtons = Array.from(document.querySelectorAll(".prio-btn"));
   const ctx = el.canvas.getContext("2d");
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   // ---------------------------------------------------------------- state
-  let zones = [];                 // { id, tag, color, mode, x, y, w, h } + runtime { lastSeen, occ, enteredAt, level }
+  let zones = [];                 // { id, tag, color, mode, priority, x, y, w, h } + runtime { lastSeen, occ, enteredAt, level }
   let poses = [];                 // latest AI results
   let bodyPose = null;
   let stream = null;
@@ -90,6 +100,7 @@
   let editingId = null;           // zone being changed
   let selectedMode = "pose";      // mode picked in the naming sheet
   let lastMode = "pose";          // remembered so kids can make several zones of the same kind quickly
+  let selectedPriority = DEFAULT_PRIORITY;   // stars picked in the naming sheet
   let lastSent = null;
   let wakeLock = null;
   let toastTimer = null;
@@ -165,7 +176,7 @@
 
   function saveZones() {
     try {
-      const plain = zones.map(({ id, tag, color, mode, x, y, w, h }) => ({ id, tag, color, mode, x, y, w, h }));
+      const plain = zones.map(({ id, tag, color, mode, priority, x, y, w, h }) => ({ id, tag, color, mode, priority, x, y, w, h }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(plain));
     } catch (err) {
       console.warn("Could not save zones", err);
@@ -178,9 +189,20 @@
       tag: z.tag,
       color: z.color || COLORS[0],
       mode: z.mode === "motion" ? "motion" : "pose",   // zones saved by older versions are pose zones
+      priority: cleanPriority(z.priority),             // ...and Normal priority
       x: clamp01(z.x), y: clamp01(z.y), w: clamp01(z.w), h: clamp01(z.h),
       lastSeen: -Infinity, occ: false, enteredAt: 0, level: 0,
     };
+  }
+
+  function cleanPriority(p) {
+    const n = Math.round(Number(p));
+    return PRIORITIES[n] ? n : DEFAULT_PRIORITY;
+  }
+
+  /** Text for a zone's label: icon + name, plus stars when it is more than Normal. */
+  function zoneLabel(z) {
+    return MODES[z.mode].icon + " " + z.tag + (z.priority > 1 ? " " + PRIORITIES[z.priority].stars : "");
   }
 
   function clamp01(n) { return Math.min(1, Math.max(0, n)); }
@@ -495,11 +517,16 @@
     syncSignal(false);
   }
 
-  /** The tag to send: the most recently entered zone that is still occupied, or CLEAR. */
+  /**
+   * The tag to send: of the occupied zones, the one with the most stars (highest priority).
+   * If several have the same stars, the most recently entered one. Nothing occupied: CLEAR.
+   */
   function currentTag() {
     let best = null;
     for (const z of zones) {
-      if (z.occ && (!best || z.enteredAt > best.enteredAt)) best = z;
+      if (!z.occ) continue;
+      if (!best || z.priority > best.priority ||
+          (z.priority === best.priority && z.enteredAt > best.enteredAt)) best = z;
     }
     return best ? best.tag : CLEAR_WORD;
   }
@@ -752,11 +779,22 @@
     b.addEventListener("click", () => { selectedMode = b.dataset.mode; refreshModeButtons(); });
   }
 
+  function refreshPrioButtons() {
+    for (const b of prioButtons) {
+      b.setAttribute("aria-pressed", Number(b.dataset.priority) === selectedPriority ? "true" : "false");
+    }
+  }
+  for (const b of prioButtons) {
+    b.addEventListener("click", () => { selectedPriority = cleanPriority(b.dataset.priority); refreshPrioButtons(); });
+  }
+
   function openNameSheet({ pending: rect, edit }) {
     pending = rect || null;
     editingId = edit ? edit.id : null;
     selectedMode = edit ? edit.mode : lastMode;
+    selectedPriority = edit ? edit.priority : DEFAULT_PRIORITY;   // new zones start as Normal
     refreshModeButtons();
+    refreshPrioButtons();
     el.nameTitle.textContent = edit ? "Change this zone" : "Name your zone";
     el.nameDelete.hidden = !edit;
     el.tagInput.value = edit ? edit.tag : "";
@@ -796,10 +834,11 @@
       if (z) {
         if (z.mode !== selectedMode) { z.mode = selectedMode; z.lastSeen = -Infinity; z.occ = false; z.level = 0; }
         z.tag = tag;
+        z.priority = selectedPriority;
       }
       toast("Zone changed: " + tag);
     } else if (pending) {
-      zones.push(makeZone({ ...pending, tag, color: nextColor(), mode: selectedMode }));
+      zones.push(makeZone({ ...pending, tag, color: nextColor(), mode: selectedMode, priority: selectedPriority }));
       toast("Zone “" + tag + "” saved!" + (btChar ? "" : " Tap 🤖 to connect your micro:bit."), btChar ? 2600 : 4500);
     }
     saveZones();
@@ -835,8 +874,9 @@
       chip.type = "button";
       chip.className = "chip" + (z.occ ? " on" : "");
       chip.style.setProperty("--c", z.color);
-      chip.textContent = MODES[z.mode].icon + " " + z.tag;
+      chip.textContent = zoneLabel(z);
       chip.setAttribute("aria-label", "Zone " + z.tag + ", watching " + MODES[z.mode].name.toLowerCase() +
+        ", " + PRIORITIES[z.priority].name.toLowerCase() + " priority" +
         (z.occ ? ", someone is in it" : ""));
       chip.addEventListener("click", () => openNameSheet({ edit: z }));
       frag.appendChild(chip);
@@ -1062,7 +1102,7 @@
     ctx.restore();
 
     if (z.tag) {
-      drawPill(MODES[z.mode].icon + " " + z.tag, x + 6, y + 6, w, z.color);
+      drawPill(zoneLabel(z), x + 6, y + 6, w, z.color);
       if (debug && z.mode === "motion") {
         drawPill("moving " + Math.round(z.level * 100) + "%", x + 6, y + h - 32, w, "#ffffff");
       }

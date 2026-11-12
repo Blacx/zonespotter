@@ -107,6 +107,19 @@
       <p class="sheet-small">Use letters, numbers and _ (no spaces). Up to 20 characters.</p>
       <p class="preview">micro:bit gets: <strong id="tagPreview">…</strong></p>
       <p id="tagError" class="error" role="alert"></p>
+      <p class="field-title" id="prioTitle">How important is this zone?</p>
+      <div class="priorities" role="group" aria-labelledby="prioTitle">
+        <button type="button" class="prio-btn" data-priority="1" aria-pressed="true">
+          <span class="prio-stars">⭐</span><span class="prio-name">Normal</span>
+        </button>
+        <button type="button" class="prio-btn" data-priority="2" aria-pressed="false">
+          <span class="prio-stars">⭐⭐</span><span class="prio-name">Important</span>
+        </button>
+        <button type="button" class="prio-btn" data-priority="3" aria-pressed="false">
+          <span class="prio-stars">⭐⭐⭐</span><span class="prio-name">Most important</span>
+        </button>
+      </div>
+      <p class="sheet-small">If people are in two zones at the same time, the micro:bit gets the zone with <strong>more stars</strong>. Same stars? The newest one wins.</p>
       <div class="sheet-buttons">
         <button type="submit" id="nameSave" class="btn btn-green">Save zone</button>
         <button type="button" id="nameDelete" class="btn btn-red" hidden>Delete zone</button>

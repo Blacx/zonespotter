@@ -3,7 +3,7 @@
  * It always tries the network first, so new versions show up as soon as you upload them.
  * (The AI model and ml5 library come from the internet, so ZoneSpotter still needs a connection.)
  */
-const CACHE = "zonespotter-v3";
+const CACHE = "zonespotter-v4";
 const SHELL = [
   "./",
   "index.html",

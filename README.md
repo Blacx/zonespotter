@@ -6,6 +6,7 @@ A kid-friendly web app that uses AI vision to spot people's feet inside zones yo
 - Each zone watches for one of two things (you choose when you save it):
   - 🦶 **Feet**: the AI finds a left or right **ankle** inside the zone. Works with several people at once.
   - 🏃 **Movement**: something **moves** inside the zone (no AI needed, so it also works when feet are hidden).
+- Each zone also gets a **priority** (⭐ Normal, ⭐⭐ Important, ⭐⭐⭐ Most important). If people are in several zones at once, the zone with the most stars is the one sent.
 - When a zone is occupied, its name is sent to the micro:bit. When every zone is empty, the micro:bit receives `CLEAR`.
 - Runs entirely in the browser. The camera picture never leaves the device. Zones and names are saved in that browser only (no accounts).
 
@@ -94,7 +95,19 @@ If the micro:bit is not listed or crashes after connecting, check step 4, make s
 
 **Movement zones.** The picture is shrunk to a tiny copy and compared with the copy from a moment earlier, about 12 times a second. If enough pixels inside the zone changed brightness, the zone is "occupied" and stays that way for 0.6 seconds after the last movement. Things that stand still do not count. If more than half of the whole picture changes at once (camera shaken, lights switched), that frame is ignored. While only movement zones exist, the AI is switched off to save battery.
 
-In both cases the micro:bit is sent the name of the most recently entered zone that is still occupied, or `CLEAR`. A message is sent only when it changes.
+In both cases the micro:bit is sent the name of **one** occupied zone, or `CLEAR`. A message is sent only when it changes.
+
+## Zone priority (when several zones are busy)
+
+When you save a zone, pick how important it is:
+
+| Stars | Name | Use it for |
+|---|---|---|
+| ⭐ | Normal (the default) | Most zones |
+| ⭐⭐ | Important | Zones that should beat normal ones |
+| ⭐⭐⭐ | Most important | The zone that must always win, for example the crossing itself |
+
+If people are in more than one zone at the same time, the micro:bit gets the zone with the **most stars**. If those zones have the same stars, the zone someone stepped into **most recently** wins (this is how every zone behaves when you leave them all on Normal). Zones with more than one star show their stars on the picture and on the zone buttons. Tap a zone button to change its stars later.
 
 The settings are at the top of `app.js`: `ANKLE_CONFIDENCE`, `MIN_POSE_SCORE`, `MODEL_MAX_DIMENSION`, `HOLD_MS`, the `MOTION_*` values, `MAX_ZONES`, `MAX_TAG_LENGTH` and `COLORS`.
 

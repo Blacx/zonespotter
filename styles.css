@@ -383,6 +383,33 @@ html, body {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   word-break: break-all;
 }
+/* "How important is this zone?" star buttons */
+.field-title { margin: 4px 0 6px; font-weight: 900; font-size: 17px; }
+.priorities { display: flex; gap: 8px; }
+.prio-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 16px;
+  border: 3px solid #d9d4ff;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.prio-btn[aria-pressed="true"] {
+  border-color: #f0a500;
+  background: #fff6d6;
+  box-shadow: 0 3px 0 #f0a500;
+}
+.prio-stars { font-size: 16px; line-height: 1.1; letter-spacing: -2px; }
+.prio-name { font-weight: 900; font-size: 13px; line-height: 1.1; text-align: center; }
 .error { min-height: 1.3em; margin: 6px 0 0; color: #c2183b; font-weight: 800; font-size: 15px; }
 .sheet-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .sheet-buttons .btn { flex: 1 1 140px; }
@@ -432,6 +459,9 @@ html, body {
   .sheet h2 { font-size: 20px; margin-bottom: 6px; }
   .sheet-text, .sheet-small, .mode-sub { display: none; }
   .modes { margin-bottom: 8px; }
+  .field-title { font-size: 15px; margin: 2px 0 4px; }
+  .prio-btn { min-height: 40px; padding: 4px; }
+  .prio-name { font-size: 12px; }
   .mode-icon { font-size: 22px; }
   #tagInput { font-size: 18px; padding: 8px 12px; }
   .preview { margin-top: 6px; }
