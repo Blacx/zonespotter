@@ -15,11 +15,15 @@
   // ---------------------------------------------------------------- settings
   const STORAGE_KEY = "zonespotter.zones.v1";
   const DEBUG_KEY = "zonespotter.debug";
+  const DRAG_TIP_KEY = "zonespotter.dragTipSeen";
   const MAX_ZONES = 12;
   const MAX_TAG_LENGTH = 20;
   const CLEAR_WORD = "CLEAR";     // sent when every zone is empty (reserved, kids cannot use it as a tag)
   const COLORS = ["#ff6b6b", "#ffd23f", "#3ddc97", "#4cc9f0", "#8e6bff", "#ff9f43", "#f368e0", "#a3e635"];
   const MIN_ZONE_SIZE = 0.04;     // smallest zone, as a fraction of the picture
+  const HANDLE_RADIUS = 11;       // size of the corner dot you drag to resize a zone (pixels)
+  const HANDLE_HIT = 28;          // how close a finger must be to the corner dot to grab it (pixels)
+  const DRAG_START_PX = 8;        // a finger must move this far before a tap turns into a drag
 
   // AI pose zones
   const ANKLE_CONFIDENCE = 0.2;   // ignore ankles the AI is less sure about than this (0 to 1)
@@ -104,6 +108,8 @@
   let lastSent = null;
   let wakeLock = null;
   let toastTimer = null;
+  let dragZone = null;            // zone being moved or resized { z, kind, start, orig, moved }
+  let dragTipSeen = false;        // has the kid already moved / resized / tapped a zone?
 
   // AI speed + "can the AI see feet?" bookkeeping
   let detectMs = 0;               // smoothed time one AI check takes
@@ -698,6 +704,8 @@
   function setDrawMode(on) {
     drawMode = on;
     drawing = null;
+    dragZone = null;
+    el.canvas.style.cursor = "";
     el.canvas.classList.toggle("drawing", on);
     el.newZoneBtn.textContent = on ? "✖ Cancel" : "➕ New zone";
     el.newZoneBtn.classList.toggle("cancel", on);
@@ -709,6 +717,7 @@
     if (drawMode) text = "Drag your finger on the picture to draw a zone.";
     else if (zones.length === 0) text = "Tap “New zone”, then draw a box where feet should be spotted.";
     else if (aiHint) text = aiHint;
+    else if (!dragTipSeen) text = "Drag a zone to move it. Drag its corner dot to make it bigger or smaller. Tap it to change it.";
     el.hint.textContent = text;
     el.hint.hidden = !text;
   }
@@ -731,20 +740,90 @@
     return { x: clamp01((ev.clientX - r.left) / r.width), y: clamp01((ev.clientY - r.top) / r.height) };
   }
 
+  /** Which zone (and which part of it) is under the finger? The corner dot wins over the inside. Top zone first. */
+  function zoneAt(p) {
+    const W = stageSize.w, H = stageSize.h;
+    for (let i = zones.length - 1; i >= 0; i--) {
+      const z = zones[i];
+      const dx = (p.x - (z.x + z.w)) * W, dy = (p.y - (z.y + z.h)) * H;
+      if (dx * dx + dy * dy <= HANDLE_HIT * HANDLE_HIT) return { z, kind: "resize" };
+    }
+    for (let i = zones.length - 1; i >= 0; i--) {
+      if (inside(p, zones[i])) return { z: zones[i], kind: "move" };
+    }
+    return null;
+  }
+
+  function markDragTipSeen() {
+    if (dragTipSeen) return;
+    dragTipSeen = true;
+    try { localStorage.setItem(DRAG_TIP_KEY, "1"); } catch (_) { /* ignore */ }
+    updateHint();
+  }
+
   el.canvas.addEventListener("pointerdown", (ev) => {
-    if (!drawMode || pending) return;
+    if (pending || dragZone || drawing) return;
+    const p = pointerToNorm(ev);
+    if (drawMode) {
+      ev.preventDefault();
+      try { el.canvas.setPointerCapture(ev.pointerId); } catch (_) { /* ignore */ }
+      drawing = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+      return;
+    }
+    // Not drawing: grab an existing zone to move it, resize it, or tap it to change it.
+    const hit = zoneAt(p);
+    if (!hit) return;
     ev.preventDefault();
     try { el.canvas.setPointerCapture(ev.pointerId); } catch (_) { /* ignore */ }
-    const p = pointerToNorm(ev);
-    drawing = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    const z = hit.z;
+    dragZone = { z, kind: hit.kind, start: p, startPx: { x: ev.clientX, y: ev.clientY },
+      orig: { x: z.x, y: z.y, w: z.w, h: z.h }, moved: false };
   });
+
   el.canvas.addEventListener("pointermove", (ev) => {
-    if (!drawing) return;
     const p = pointerToNorm(ev);
-    drawing.x1 = p.x;
-    drawing.y1 = p.y;
+    if (drawing) {
+      drawing.x1 = p.x;
+      drawing.y1 = p.y;
+      return;
+    }
+    if (dragZone) {
+      const d = dragZone;
+      if (!d.moved) {
+        if (Math.hypot(ev.clientX - d.startPx.x, ev.clientY - d.startPx.y) < DRAG_START_PX) return;
+        d.moved = true;
+      }
+      const dx = p.x - d.start.x, dy = p.y - d.start.y;
+      const z = d.z, o = d.orig;
+      if (d.kind === "move") {
+        z.x = Math.min(Math.max(0, o.x + dx), 1 - o.w);
+        z.y = Math.min(Math.max(0, o.y + dy), 1 - o.h);
+      } else {
+        z.w = Math.min(Math.max(MIN_ZONE_SIZE, o.w + dx), 1 - o.x);
+        z.h = Math.min(Math.max(MIN_ZONE_SIZE, o.h + dy), 1 - o.y);
+      }
+      return;
+    }
+    // Just hovering with a mouse: show what a drag would do.
+    if (!drawMode && ev.pointerType === "mouse") {
+      const hit = zoneAt(p);
+      el.canvas.style.cursor = hit ? (hit.kind === "resize" ? "nwse-resize" : "move") : "";
+    }
   });
+
   const endDrag = (ev) => {
+    if (dragZone) {
+      const d = dragZone;
+      dragZone = null;
+      if (ev.type === "pointercancel") {
+        Object.assign(d.z, d.orig);   // put it back where it was
+        return;
+      }
+      markDragTipSeen();
+      if (d.moved) saveZones();
+      else openNameSheet({ edit: d.z });   // a simple tap opens the zone's settings
+      return;
+    }
     if (!drawing) return;
     const rect = {
       x: Math.min(drawing.x0, drawing.x1),
@@ -1101,6 +1180,18 @@
     ctx.stroke();
     ctx.restore();
 
+    if (opts.handle) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + w, y + h, opts.grabbed ? HANDLE_RADIUS + 3 : HANDLE_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = z.color;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (z.tag) {
       drawPill(zoneLabel(z), x + 6, y + 6, w, z.color);
       if (debug && z.mode === "motion") {
@@ -1120,7 +1211,13 @@
       updateAiHint(now);
 
       for (const z of zones) {
-        drawZoneBox(z, W, H, { occ: z.occ, dashed: z.id === editingId });
+        const grabbed = !!(dragZone && dragZone.z === z && dragZone.moved);
+        drawZoneBox(z, W, H, {
+          occ: z.occ,
+          dashed: z.id === editingId || grabbed,
+          handle: !drawMode && !pending,
+          grabbed,
+        });
       }
 
       if (debug) {
@@ -1218,6 +1315,7 @@
     startedAt = performance.now();
     layoutStage();
     loadZones();
+    try { dragTipSeen = localStorage.getItem(DRAG_TIP_KEY) === "1"; } catch (_) { /* ignore */ }
     initDebugFromUrlOrStorage();
     renderChips();
     setBtState("off");

@@ -6,6 +6,7 @@ A kid-friendly web app that uses AI vision to spot people's feet inside zones yo
 - Each zone watches for one of two things (you choose when you save it):
   - 🦶 **Feet**: the AI finds a left or right **ankle** inside the zone. Works with several people at once.
   - 🏃 **Movement**: something **moves** inside the zone (no AI needed, so it also works when feet are hidden).
+- Move a zone by **dragging** it, resize it by dragging the **white dot** on its bottom-right corner, and **tap** it to rename it, change its type or stars, or delete it.
 - Each zone also gets a **priority** (⭐ Normal, ⭐⭐ Important, ⭐⭐⭐ Most important). If people are in several zones at once, the zone with the most stars is the one sent.
 - When a zone is occupied, its name is sent to the micro:bit. When every zone is empty, the micro:bit receives `CLEAR`.
 - Runs entirely in the browser. The camera picture never leaves the device. Zones and names are saved in that browser only (no accounts).
